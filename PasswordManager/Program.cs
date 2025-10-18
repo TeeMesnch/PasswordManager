@@ -8,7 +8,8 @@ namespace PasswordManager
         {
             var commandList = new Dictionary<string, Action>
             {
-                { "INIT", Init.Initialize},
+                { "INIT", Init.InitializeDatabase },
+                { "DELETE", Init.DeleteDatabase },
                 { "--add", CommandExecution.Add },
                 { "-A", CommandExecution.Add },
                 { "--remove", CommandExecution.Remove },
@@ -34,7 +35,26 @@ namespace PasswordManager
 
     static class Init
     {
-        public static void Initialize()
+        public static void InitializeDatabase()
+        {
+            using var connection = new SqliteConnection("Filename = database.db");
+            
+            connection.Open();
+            
+            using var command = connection.CreateCommand();
+            
+            command.CommandText = """
+                                      CREATE TABLE IF NOT EXISTS Passwords (
+                                          Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                          Service TEXT NOT NULL,
+                                          Username TEXT,
+                                          Password TEXT NOT NULL
+                                      );
+                                  """;
+            command.ExecuteNonQuery();
+        }
+
+        public static void DeleteDatabase()
         {
             
         }
