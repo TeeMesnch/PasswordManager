@@ -1,4 +1,5 @@
 ﻿using System.Security.Cryptography;
+using System.Text;
 using Microsoft.Data.Sqlite;
 
 namespace PasswordManager
@@ -36,7 +37,7 @@ namespace PasswordManager
         public static string ReadPasswordFromConsole(string prompt = "Password: ")
         {
             Console.Write(prompt);
-            var pwd = new System.Text.StringBuilder();
+            var pwd = new StringBuilder();
             ConsoleKeyInfo key;
 
             while ((key = Console.ReadKey(intercept: true)).Key != ConsoleKey.Enter)
@@ -110,12 +111,11 @@ namespace PasswordManager
 
             Console.WriteLine("Done initializing database. You may set your MASTER password now!");
 
-            Console.Write("Master password: ");
             string master = MainClass.ReadPasswordFromConsole();
 
             if (!string.IsNullOrEmpty(master))
             {
-                string hashedMaster = StorePassword.Hash(master); // CHANGE LATER
+                string hashedMaster = PasswordHasher.Hash(master);
 
                 command.CommandText = """
                                           INSERT INTO MasterPassword (Id, Hash)
@@ -142,12 +142,38 @@ namespace PasswordManager
         {
             if (File.Exists("database.db"))
             {
-                File.Delete("database.db");
-                Console.WriteLine("successfully deleted database");
+                Console.WriteLine("Before deleting the Database type in your master password.");
+                string? typedIn = MainClass.ReadPasswordFromConsole();
+
+                using var connection = new SqliteConnection($"Data Source=database.db");
+                connection.Open();
+
+                using var command = connection.CreateCommand();
+
+                command.CommandText = """
+                                      SELECT Hash FROM MasterPassword;
+                                      """;
+
+                string password = "password";
+                using var reader = command.ExecuteReader();
+
+                if (reader.HasRows)
+                {
+                    while (reader.Read())
+                    {
+                        password = reader.GetString(0);
+                    }
+                }
+
+                if (PasswordHasher.Verify(typedIn, password))
+                {
+                    File.Delete("database.db");
+                    Console.WriteLine("Database file deleted.");
+                }
             }
             else
             {
-                Console.WriteLine("Error: Database not found");
+                Console.WriteLine("No Database file found. Try --help or -H");
             }
         }
     }
@@ -185,22 +211,49 @@ namespace PasswordManager
             Console.WriteLine("To change type --change or -C followed by {originalUser} {originalPassword} {newUser} {newPassword}");
         }
     }
-
-    static class StorePassword
+    
+    public static class PasswordHasher
     {
+        private const int SaltLength = 16;
+        
         public static string Hash(string password)
         {
-            static void AddSalt()
-            {
-                
-            }
+            byte[] salt = new byte[SaltLength];
+            RandomNumberGenerator.Fill(salt);
 
-            return password;
+            byte[] passwordBytes = Encoding.UTF8.GetBytes(password);
+            byte[] saltedPassword = new byte[salt.Length + passwordBytes.Length];
+            Buffer.BlockCopy(salt, 0, saltedPassword, 0, salt.Length);
+            Buffer.BlockCopy(passwordBytes, 0, saltedPassword, salt.Length, passwordBytes.Length);
+
+            byte[] hash = SHA256.HashData(saltedPassword);
+
+            byte[] result = new byte[salt.Length + hash.Length];
+            Buffer.BlockCopy(salt, 0, result, 0, salt.Length);
+            Buffer.BlockCopy(hash, 0, result, salt.Length, hash.Length);
+
+            return Convert.ToBase64String(result);
         }
 
-        public static void AddToDatabase()
+        public static bool Verify(string password, string storedHash)
         {
+            byte[] storedBytes = Convert.FromBase64String(storedHash);
+            byte[] salt = new byte[SaltLength];
+            byte[] storedHashBytes = new byte[storedBytes.Length - SaltLength];
+
+            Buffer.BlockCopy(storedBytes, 0, salt, 0, SaltLength);
+            Buffer.BlockCopy(storedBytes, SaltLength, storedHashBytes, 0, storedHashBytes.Length);
+
+            byte[] passwordBytes = Encoding.UTF8.GetBytes(password);
+            byte[] saltedPassword = new byte[salt.Length + passwordBytes.Length];
             
+            Buffer.BlockCopy(salt, 0, saltedPassword, 0, salt.Length);
+            Buffer.BlockCopy(passwordBytes, 0, saltedPassword, salt.Length, passwordBytes.Length);
+
+            byte[] computedHash = SHA256.HashData(saltedPassword);
+
+            return CryptographicOperations.FixedTimeEquals(storedHashBytes, computedHash);
         }
     }
+
 }
