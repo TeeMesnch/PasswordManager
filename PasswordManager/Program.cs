@@ -143,27 +143,7 @@ namespace PasswordManager
                 Console.WriteLine("Before deleting the Database type in your master password.");
                 string typedIn = MainClass.ReadPasswordFromConsole();
 
-                using var connection = new SqliteConnection($"Data Source=database.db");
-                connection.Open();
-
-                using var command = connection.CreateCommand();
-
-                command.CommandText = """
-                                      SELECT Hash FROM MasterPassword;
-                                      """;
-
-                string password = "password";
-                using var reader = command.ExecuteReader();
-
-                if (reader.HasRows)
-                {
-                    while (reader.Read())
-                    {
-                        password = reader.GetString(0);
-                    }
-                }
-
-                if (PasswordHasher.Verify(typedIn, password))
+                if (PasswordHasher.Verify(typedIn, PasswordHasher.ReadHashedPassword()))
                 {
                     File.Delete("database.db");
                     Console.WriteLine("Database file deleted.");
@@ -183,43 +163,68 @@ namespace PasswordManager
         {
             var username = args[1];
             var password = args[2];
-            
-            Console.WriteLine(username);
-            Console.WriteLine(password);
-            
+
             var hashedPassword = PasswordHasher.Hash(password);
-            
+
             if (File.Exists("database.db"))
             {
-                using var connection = new SqliteConnection($"Data Source=database.db");
+                using var connection = new SqliteConnection("Data Source=database.db");
                 connection.Open();
 
-                using var command = new SqliteCommand();
+                using var command = connection.CreateCommand();
 
-                command.CommandText = $"""
+                command.CommandText = """
                                       INSERT INTO Data (Username, Password)
-                                      VALUES ({username}, {hashedPassword}); --fix later
+                                      VALUES (@username, @password);
                                       """;
 
-                Console.WriteLine("inserted");
+                command.Parameters.AddWithValue("@username", username);
+                command.Parameters.AddWithValue("@password", hashedPassword);
+
+                command.ExecuteNonQuery();
+
+                Console.WriteLine($"Successfully added new password (user : {username})");
             }
             else
             {
                 Console.WriteLine("Database file not found. Try --help or -H");
             }
         }
+
 
         public static void Remove(string[] args)
         {
             if (File.Exists("database.db"))
             {
+                var entryToRemove = args[1];
+
+                Console.WriteLine("Before deleting the Password type in your master password.");
+                string typedIn = MainClass.ReadPasswordFromConsole();
                 
+                using var connection = new SqliteConnection("Data Source=database.db");
+                connection.Open();
+
+                using var command = connection.CreateCommand();
+
+                command.CommandText = """
+                                      DELETE FROM Data WHERE Username = @username;
+                                      """;
+
+                command.Parameters.AddWithValue("@username", entryToRemove);
+
+                if (PasswordHasher.Verify(typedIn, PasswordHasher.ReadHashedPassword()))
+                {
+                    command.ExecuteNonQuery();
+
+                    Console.WriteLine($"Successfully removed the password (user : {entryToRemove})");
+                }
             }
             else
             {
                 Console.WriteLine("Database file not found. Try --help or -H");
             }
         }
+
 
         public static void Change(string[] args)
         {
@@ -279,6 +284,31 @@ namespace PasswordManager
             return Convert.ToBase64String(result);
         }
 
+        public static string ReadHashedPassword()
+        {
+            using var connection = new SqliteConnection($"Data Source=database.db");
+            connection.Open();
+
+            using var command = connection.CreateCommand();
+
+            command.CommandText = """
+                                  SELECT Hash FROM MasterPassword;
+                                  """;
+
+            string password = "password";
+            using var reader = command.ExecuteReader();
+
+            if (reader.HasRows)
+            {
+                while (reader.Read())
+                {
+                    password = reader.GetString(0);
+                }
+            }
+            
+            return password;
+        }
+        
         public static bool Verify(string password, string storedHash)
         {
             byte[] storedBytes = Convert.FromBase64String(storedHash);
