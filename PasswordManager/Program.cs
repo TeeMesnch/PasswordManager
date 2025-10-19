@@ -1,4 +1,4 @@
-﻿using System.IO;
+﻿using System.Security.Cryptography;
 using Microsoft.Data.Sqlite;
 
 namespace PasswordManager
@@ -32,6 +32,33 @@ namespace PasswordManager
                 Console.WriteLine("Unknown command try --help or -H");
             }
         }
+        
+        public static string ReadPasswordFromConsole(string prompt = "Password: ")
+        {
+            Console.Write(prompt);
+            var pwd = new System.Text.StringBuilder();
+            ConsoleKeyInfo key;
+
+            while ((key = Console.ReadKey(intercept: true)).Key != ConsoleKey.Enter)
+            {
+                if (key.Key == ConsoleKey.Backspace)
+                {
+                    if (pwd.Length > 0)
+                    {
+                        pwd.Length--;
+                        Console.Write("\b \b");
+                    }
+                }
+                else if (!char.IsControl(key.KeyChar))
+                {
+                    pwd.Append(key.KeyChar);
+                    Console.Write('*');
+                }
+            }
+            Console.WriteLine();
+            return pwd.ToString();
+        }
+
     }
 
     static class Init
@@ -84,11 +111,11 @@ namespace PasswordManager
             Console.WriteLine("Done initializing database. You may set your MASTER password now!");
 
             Console.Write("Master password: ");
-            string? master = Console.ReadLine();
+            string master = MainClass.ReadPasswordFromConsole();
 
             if (!string.IsNullOrEmpty(master))
             {
-                string hashedMaster = master; // CHANGE LATER
+                string hashedMaster = StorePassword.Hash(master); // CHANGE LATER
 
                 command.CommandText = """
                                           INSERT INTO MasterPassword (Id, Hash)
@@ -156,6 +183,24 @@ namespace PasswordManager
             Console.WriteLine("To view your password type --show or -S followed by {user}");
             Console.WriteLine("To remove a single password type --remove or -R followed by {user} {password}");
             Console.WriteLine("To change type --change or -C followed by {originalUser} {originalPassword} {newUser} {newPassword}");
+        }
+    }
+
+    static class StorePassword
+    {
+        public static string Hash(string password)
+        {
+            static void AddSalt()
+            {
+                
+            }
+
+            return password;
+        }
+
+        public static void AddToDatabase()
+        {
+            
         }
     }
 }
