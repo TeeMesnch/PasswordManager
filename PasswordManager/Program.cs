@@ -39,10 +39,17 @@ namespace PasswordManager
         public static void InitializeDatabase()
         {
             const string dbFile = "database.db";
-            
+
             if (!File.Exists(dbFile))
             {
-                using (File.Create(dbFile)) {} 
+                using (File.Create(dbFile))
+                {
+                }
+            }
+            else
+            {
+                Console.WriteLine("Database file already exists.");
+                return;
             }
 
             using var connection = new SqliteConnection($"Data Source={dbFile}");
@@ -55,7 +62,7 @@ namespace PasswordManager
 
             using var command = connection.CreateCommand();
 
-            Console.WriteLine("setting up database...");
+            Console.WriteLine("Setting up database...");
 
             command.CommandText = """
                                       CREATE TABLE IF NOT EXISTS Data (
@@ -66,36 +73,79 @@ namespace PasswordManager
                                   """;
             command.ExecuteNonQuery();
 
-            Console.WriteLine("Done initializing database");
+            command.CommandText = """
+                                      CREATE TABLE IF NOT EXISTS MasterPassword (
+                                          Id INTEGER PRIMARY KEY CHECK (Id = 1),
+                                          Hash TEXT NOT NULL
+                                      );
+                                  """;
+            command.ExecuteNonQuery();
+
+            Console.WriteLine("Done initializing database. You may set your MASTER password now!");
+
+            Console.Write("Master password: ");
+            string? master = Console.ReadLine();
+
+            if (!string.IsNullOrEmpty(master))
+            {
+                string hashedMaster = master; // CHANGE LATER
+
+                command.CommandText = """
+                                          INSERT INTO MasterPassword (Id, Hash)
+                                          VALUES (1, $hash)
+                                          ON CONFLICT(Id) DO UPDATE SET Hash = $hash;
+                                      """;
+                command.Parameters.Clear();
+                command.Parameters.AddWithValue("$hash", hashedMaster);
+                command.ExecuteNonQuery();
+
+                Console.WriteLine("Master password set.");
+            }
+            else
+            {
+                Console.WriteLine("No password entered. Master password was not set.");
+            }
         }
+
+
+
 
 
         public static void DeleteDatabase()
         {
-            
+            if (File.Exists("database.db"))
+            {
+                File.Delete("database.db");
+                Console.WriteLine("successfully deleted database");
+            }
+            else
+            {
+                Console.WriteLine("Error: Database not found");
+            }
         }
     }
+
 
     static class CommandExecution
     {
         public static void Add()
         {
-            
+
         }
 
         public static void Remove()
         {
-            
+
         }
 
         public static void Change()
         {
-            
+
         }
 
         public static void Show()
         {
-            
+
         }
 
         public static void Help()
