@@ -8,7 +8,7 @@ namespace PasswordManager
     {
         static void Main(string[] args)
         {
-            var commandList = new Dictionary<string, Action>
+            var commandList = new Dictionary<string, Action<string[]>>
             {
                 { "INIT", Init.InitializeDatabase },
                 { "DELETE", Init.DeleteDatabase },
@@ -26,7 +26,7 @@ namespace PasswordManager
 
             if (commandList.TryGetValue(args[0], out var commandAction))
             {
-                commandAction();
+                commandAction(args);
             }
             else
             {
@@ -64,15 +64,13 @@ namespace PasswordManager
 
     static class Init
     {
-        public static void InitializeDatabase()
+        public static void InitializeDatabase(string[] placeholder)
         {
             const string dbFile = "database.db";
 
             if (!File.Exists(dbFile))
             {
-                using (File.Create(dbFile))
-                {
-                }
+                using (File.Create(dbFile));
             }
             else
             {
@@ -138,12 +136,12 @@ namespace PasswordManager
 
 
 
-        public static void DeleteDatabase()
+        public static void DeleteDatabase(string[] placeholder)
         {
             if (File.Exists("database.db"))
             {
                 Console.WriteLine("Before deleting the Database type in your master password.");
-                string? typedIn = MainClass.ReadPasswordFromConsole();
+                string typedIn = MainClass.ReadPasswordFromConsole();
 
                 using var connection = new SqliteConnection($"Data Source=database.db");
                 connection.Open();
@@ -181,27 +179,73 @@ namespace PasswordManager
 
     static class CommandExecution
     {
-        public static void Add()
+        public static void Add(string[] args)
         {
+            var username = args[1];
+            var password = args[2];
+            
+            Console.WriteLine(username);
+            Console.WriteLine(password);
+            
+            var hashedPassword = PasswordHasher.Hash(password);
+            
+            if (File.Exists("database.db"))
+            {
+                using var connection = new SqliteConnection($"Data Source=database.db");
+                connection.Open();
 
+                using var command = new SqliteCommand();
+
+                command.CommandText = $"""
+                                      INSERT INTO Data (Username, Password)
+                                      VALUES ({username}, {hashedPassword}); --fix later
+                                      """;
+
+                Console.WriteLine("inserted");
+            }
+            else
+            {
+                Console.WriteLine("Database file not found. Try --help or -H");
+            }
         }
 
-        public static void Remove()
+        public static void Remove(string[] args)
         {
-
+            if (File.Exists("database.db"))
+            {
+                
+            }
+            else
+            {
+                Console.WriteLine("Database file not found. Try --help or -H");
+            }
         }
 
-        public static void Change()
+        public static void Change(string[] args)
         {
-
+            if (File.Exists("database.db"))
+            {
+                
+            }
+            else
+            {
+                Console.WriteLine("Database file not found. Try --help or -H");
+            }
         }
 
-        public static void Show()
+        public static void Show(string[] args)
         {
-
+            if (File.Exists("database.db"))
+            {
+                
+            }
+            else
+            {
+                Console.WriteLine("Database file not found. Try --help or -H");
+            }
         }
 
-        public static void Help()
+        public static void Help(string[] placeholder)
         {
             Console.WriteLine("To get started type INIT to create a new database");
             Console.WriteLine("Type DELETE to delete every stored password");
