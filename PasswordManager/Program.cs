@@ -117,11 +117,11 @@ namespace PasswordManager
 
                 command.CommandText = """
                                           INSERT INTO MasterPassword (Id, Hash)
-                                          VALUES (1, $hash)
-                                          ON CONFLICT(Id) DO UPDATE SET Hash = $hash;
+                                          VALUES (1, @hash)
+                                          ON CONFLICT(Id) DO UPDATE SET Hash = @hash;
                                       """;
                 command.Parameters.Clear();
-                command.Parameters.AddWithValue("$hash", hashedMaster);
+                command.Parameters.AddWithValue("@hash", hashedMaster);
                 command.ExecuteNonQuery();
 
                 Console.WriteLine("Master password set.");
@@ -242,7 +242,43 @@ namespace PasswordManager
         {
             if (File.Exists("database.db"))
             {
+                var entryToShow = args[1];
+
+                var typedIn = MainClass.ReadPasswordFromConsole();
                 
+                if (PasswordHasher.Verify(typedIn, PasswordHasher.ReadHashedPassword()))
+                {
+                    using var connection = new SqliteConnection($"Data Source=database.db");
+                    connection.Open();
+
+                    using var command = connection.CreateCommand();
+
+                    command.CommandText = $"""
+                                          SELECT Username, Password FROM Data WHERE Username = @username;
+                                          """;
+                    
+                    command.Parameters.AddWithValue("@username", entryToShow);
+                    
+                    using var reader = command.ExecuteReader();
+
+                    string user = string.Empty;
+                    string password = string.Empty;
+                    
+                    if (reader.HasRows)
+                    {
+                        while (reader.Read())
+                        {
+                            user = reader.GetString(0);
+                            password = reader.GetString(1);
+                        }
+                    }
+                    
+                    Console.WriteLine($"(user : {user}) (password : {password})");
+                }
+                else
+                {
+                    Console.WriteLine("Password cannot be verified");
+                }
             }
             else
             {
@@ -253,7 +289,7 @@ namespace PasswordManager
         public static void Help(string[] placeholder)
         {
             Console.WriteLine("To get started type INIT to create a new database");
-            Console.WriteLine("Type DELETE to delete every stored password");
+            Console.WriteLine("Type DELETE to delete every stored password and the associated Database");
             Console.WriteLine("To add type --add or -A followed by {user} {password}");
             Console.WriteLine("To view your password type --show or -S followed by {user}");
             Console.WriteLine("To remove a single password type --remove or -R followed by {user} {password}");
