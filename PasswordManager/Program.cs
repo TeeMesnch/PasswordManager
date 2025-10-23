@@ -230,7 +230,36 @@ namespace PasswordManager
         {
             if (File.Exists("database.db"))
             {
+                var entryToChange = args[1];
                 
+                var typedIn = MainClass.ReadPasswordFromConsole();
+                
+                var newUsername = args[2];
+                var newPassword = args[3];
+                
+                var hashedPassword = PasswordHasher.Hash(newPassword);
+
+                if (PasswordHasher.Verify(typedIn, PasswordHasher.ReadHashedPassword()))
+                {
+                    using var connection = new SqliteConnection("Data Source=database.db");
+                    connection.Open();
+                    
+                    using var command = connection.CreateCommand();
+
+                    command.CommandText = """
+                                          DELETE FROM Data WHERE Username = @username;
+                                          INSERT INTO Data (Username, Password)
+                                          VALUES (@newUsername, @newPassword);
+                                          """;
+                    
+                    command.Parameters.AddWithValue("@username", entryToChange);
+                    command.Parameters.AddWithValue("@newPassword", hashedPassword);
+                    command.Parameters.AddWithValue("@newUsername", newUsername);
+                    
+                    command.ExecuteNonQuery();
+                    
+                    Console.WriteLine($"Successfully changed the password (user : {newUsername})");
+                }
             }
             else
             {
@@ -293,7 +322,7 @@ namespace PasswordManager
             Console.WriteLine("To add type --add or -A followed by {user} {password}");
             Console.WriteLine("To view your password type --show or -S followed by {user}");
             Console.WriteLine("To remove a single password type --remove or -R followed by {user} {password}");
-            Console.WriteLine("To change type --change or -C followed by {originalUser} {originalPassword} {newUser} {newPassword}");
+            Console.WriteLine("To change type --change or -C followed by {originalUser} {newUser} {newPassword}");
         }
     }
     
