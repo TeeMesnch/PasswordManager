@@ -299,11 +299,13 @@ namespace PasswordManager
                         {
                             user = reader.GetString(0);
                             password = reader.GetString(1);
+                            password = string.Empty;
                         }
                     }
                     
                     Console.WriteLine($"(user : {user}) (password : {password})");
                 }
+                    
                 else
                 {
                     Console.WriteLine("Password cannot be verified");
@@ -392,6 +394,16 @@ namespace PasswordManager
             byte[] computedHash = SHA256.HashData(saltedPassword);
 
             return CryptographicOperations.FixedTimeEquals(storedHashBytes, computedHash);
+        }
+
+        public static void DeriveKey(string typedIn, string password)
+        {
+            if (Verify(typedIn, password))
+            {
+                // derive key based on typedin
+                
+                
+            }
         }
     }
 
