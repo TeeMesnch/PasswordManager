@@ -113,7 +113,7 @@ namespace PasswordManager
 
             if (!string.IsNullOrEmpty(master))
             {
-                string hashedMaster = PasswordHasher.Hash(master);
+                string hashedMaster = PasswordHasher.Hash(master).result;
 
                 command.CommandText = """
                                           INSERT INTO MasterPassword (Id, Hash)
@@ -332,7 +332,7 @@ namespace PasswordManager
     {
         private const int SaltLength = 16;
         
-        public static string Hash(string password)
+        public static (string result, byte[] salt) Hash(string password)
         {
             byte[] salt = new byte[SaltLength];
             RandomNumberGenerator.Fill(salt);
@@ -348,7 +348,7 @@ namespace PasswordManager
             Buffer.BlockCopy(salt, 0, result, 0, salt.Length);
             Buffer.BlockCopy(hash, 0, result, salt.Length, hash.Length);
 
-            return Convert.ToBase64String(result);
+            return (Convert.ToBase64String(result), salt);
         }
 
         public static string ReadHashedPassword()
@@ -396,13 +396,48 @@ namespace PasswordManager
             return CryptographicOperations.FixedTimeEquals(storedHashBytes, computedHash);
         }
 
-        public static void DeriveKey(string typedIn, string password)
+        public static void DeriveKey(string typedIn, string password, byte[] salt)
         {
             if (Verify(typedIn, password))
             {
                 // derive key based on typedin
+
+                Rfc2898DeriveBytes derivedBytes = new Rfc2898DeriveBytes(typedIn, salt, 10000);
+                Rfc2898DeriveBytes decryptBytes = new Rfc2898DeriveBytes(typedIn, salt);
                 
+                Aes encryptionAes = Aes.Create();
+                encryptionAes.Key = derivedBytes.GetBytes(16);
                 
+                MemoryStream encryptionStream = new MemoryStream();
+                CryptoStream encrypt = new CryptoStream(encryptionStream, encryptionAes.CreateEncryptor(), CryptoStreamMode.Write);
+                
+                byte[] data = Encoding.UTF8.GetBytes(typedIn);
+                
+                encrypt.Write(data, 0, data.Length);
+                encrypt.FlushFinalBlock();
+                encrypt.Close();
+                byte[] encryptedData = encryptionStream.ToArray();
+                derivedBytes.Reset();
+                
+                Aes decryptionAlgorithm = Aes.Create();
+                decryptionAlgorithm.Key = decryptBytes.GetBytes(16);
+                decryptionAlgorithm.IV = encryptionAes.IV;
+                MemoryStream decryptionStreamBacking = new MemoryStream();
+                CryptoStream decrypt = new CryptoStream(decryptionStreamBacking, decryptionAlgorithm.CreateDecryptor(), CryptoStreamMode.Write);
+                decrypt.Write(encryptedData, 0, encryptedData.Length);
+                decrypt.Flush();
+                decrypt.Close();
+                decryptBytes.Reset();
+                string data2 = new UTF8Encoding(false).GetString(decryptionStreamBacking.ToArray());
+                
+                if (!data.Equals(data2))
+                {
+                    Console.WriteLine("Error: The two values are not equal.");
+                }
+                else
+                {
+                    Console.WriteLine("The two values are equal.");
+                }
             }
         }
     }
